@@ -18,7 +18,8 @@ camera_pivot = (toFloat(0xC419EE01), toFloat(0x44D0F2EF))
 banjo_pos = (toFloat(0x4554E000), toFloat(0x43AF8000))
 
 def bk_round(f):
-    return float32(round((f-0.009) / 0.018) * 0.018 + 0.009)
+    return f
+    #return float32(round((f-0.009) / 0.018) * 0.018 + 0.009)
 
 def getCamRot(camera_pivot, pos):
     return bk_round(math.degrees(math.atan2((camera_pivot[0]-pos[0]), (camera_pivot[1]-pos[1])))) % 360
@@ -34,7 +35,7 @@ banjo_cam_rot = getCamRot(camera_pivot, banjo_pos)
 #print(getCamRot(camera_pivot, (toFloat(0x4541C64B), toFloat(0x43E1A76B))))
 
 
-'''
+
 outfile = open('260_door_gap_cameras.txt','w')
 outfile_lines = []
 
@@ -43,8 +44,7 @@ for line in open('gap_results_260.txt'):
     if match:
         gap_coords = [float(s) for s in match.groups()]
         cam_rot = getCamRot(camera_pivot, gap_coords)
-        cam_rot_int = round(cam_rot / 0.009)
-        outfile_lines.append('%d\t%g\t%s\n' % (cam_rot_int, cam_rot, gap_coords))
+        outfile_lines.append('%s\t%s\n' % (cam_rot, gap_coords))
 
         #if cam_rot == banjo_cam_rot:
         #    print(gap_coords)
@@ -53,7 +53,7 @@ for line in sorted(outfile_lines):
     outfile.write(line)
 
 outfile.close()
-'''
+
 
 def move(initial_pos, camera_rot, speed):
     initial_pos = tuple(float32(x) for x in initial_pos)

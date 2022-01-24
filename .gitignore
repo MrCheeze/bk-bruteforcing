@@ -1,3 +1,4 @@
 *.exe
 a.out
 __pycache__/
+*.bin
