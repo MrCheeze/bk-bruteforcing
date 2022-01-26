@@ -6,7 +6,7 @@ import copy
 from bk_math_lib import *
 
 class Banjo:
-    def __init__(self, pos, speed, angle, moving):
+    def __init__(self, pos, speed, angle, moving=None):
         self.pos = np.array(pos, dtype=float32)
         self.speed = np.array(speed, dtype=float32)
         self.angle = float32(angle)
