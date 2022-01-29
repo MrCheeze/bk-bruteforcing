@@ -3,3 +3,5 @@ a.out
 __pycache__/
 *.bin
 *.log
+gap_input.txt
+gap_results.txt

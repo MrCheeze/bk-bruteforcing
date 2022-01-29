@@ -30,6 +30,7 @@ def read_speeds(f):
 f32 = np.dtype(np.float32).newbyteorder('>')
 base_pos = np.array((3000, 300), dtype=float32)
 twentyfive = float32(25)
+thirty = float32(30)
 drag_factor = float32(0.07)
 pal_factor = float32(1.2000011)
 
@@ -41,15 +42,32 @@ print(distance)
 while distance != distance+speed:
     distance += speed/twentyfive
     speed += (-speed * float32(0.29) * pal_factor)
-    print(speed, distance)
+    #print(speed, distance)
+
+print(distance)
+print(float32(distance))
+
+# 0.11494242337174414
+# 0.114942424
+# 0.11494243
+
+distance = float32(0)
+speed = float32(1)
+
+print(distance)
+
+while distance != distance+speed:
+    distance += speed/thirty
+    speed += (-speed * float32(0.29) * float32(1.0000011))
+    #print(speed, distance)
 
 print(distance)
 print(float32(distance))
 1/0
 
-# 0.11494242337174414
-# 0.114942424
-# 0.11494243
+# 0.11494253204306404
+# 0.114942536
+# 0.11494253
 
 outfile = open('outfile.txt','w')
 

@@ -68,10 +68,11 @@ class CameraPivot:
         return vars(self) == vars(other)
 
 class Game:
-    def __init__(self, banjo, camera, camera_pivot):
+    def __init__(self, banjo, camera, camera_pivot, is_pal):
         self.banjo = banjo
         self.camera = camera
         self.camera_pivot = camera_pivot
+        self.is_pal = bool(is_pal)
 
     def __repr__(self):
         return 'Game(%s, %s)' % (self.banjo, self.camera)
@@ -80,7 +81,7 @@ class Game:
         return vars(self) == vars(other)
 
     def __copy__(self):
-        return Game(copy.copy(self.banjo), copy.copy(self.camera), self.camera_pivot)
+        return Game(copy.copy(self.banjo), copy.copy(self.camera), self.camera_pivot, self.is_pal)
 
     def _get_style_and_drag_factor(self, movement_type):
 
@@ -181,9 +182,12 @@ class Game:
         style, drag_factor = self._get_style_and_drag_factor(movement_type)
         target_speed = self._translate_input_magnitude_to_speed(movement_type, h)
 
-        pal_factor = float32(1.2000011)
-
         input_angle = float32( (ml_vec3f_yaw_towards((y_processed, x_processed)) + self.camera.angle + float32(90)) % 360 )
+
+        if self.is_pal:
+            pal_factor = float32(1.2000011)
+        else:
+            pal_factor = float32(1.0000011)
         
         if style == 'can_turn':
 
@@ -221,9 +225,13 @@ class Game:
             self.banjo.speed[0] = float32(0)
         if abs(self.banjo.speed[1]) < 0.0001:
             self.banjo.speed[1] = float32(0)
-        
-        self.banjo.pos[0] += self.banjo.speed[0] / float32(25)
-        self.banjo.pos[1] += self.banjo.speed[1] / float32(25)
+
+        if self.is_pal:
+            self.banjo.pos[0] += self.banjo.speed[0] / float32(25)
+            self.banjo.pos[1] += self.banjo.speed[1] / float32(25)
+        else:
+            self.banjo.pos[0] += self.banjo.speed[0] / float32(30)
+            self.banjo.pos[1] += self.banjo.speed[1] / float32(30)
 
         self.banjo.moving = (target_speed != 0 or self.banjo.speed[0] != 0 or self.banjo.speed[1] != 0)
 
@@ -250,7 +258,12 @@ class Game:
 
         unk_factor = float32(0.003333)
 
-        for _ in range(12):
+        if self.is_pal:
+            iteration_count = 12
+        else:
+            iteration_count = 10
+
+        for _ in range(iteration_count):
             self.camera.speed[0] += ((target_camera_x - self.camera.pos[0]) * unk_factor * self.camera_pivot.pos_factor_a - self.camera.speed[0]) * unk_factor * self.camera_pivot.pos_factor_b
             self.camera.speed[1] += ((target_camera_z - self.camera.pos[1]) * unk_factor * self.camera_pivot.pos_factor_a - self.camera.speed[1]) * unk_factor * self.camera_pivot.pos_factor_b
             self.camera.pos[0] += self.camera.speed[0]
@@ -270,10 +283,14 @@ class Game:
         if camera_angle_diff > 180:
             camera_angle_diff -= float32(360)
 
-        unk_factor2 = float32(0.04)
+        if self.is_pal:
+            frame_length = float32(1/25)
+        else:
+            frame_length = float32(1/30)
+            
         unk_factor3 = float32(0.0333)
 
-        self.camera.angular_momentum += (camera_angle_diff * unk_factor2 * self.camera_pivot.ang_factor_a - self.camera.angular_momentum) * unk_factor3 * self.camera_pivot.ang_factor_b
+        self.camera.angular_momentum += (camera_angle_diff * frame_length * self.camera_pivot.ang_factor_a - self.camera.angular_momentum) * unk_factor3 * self.camera_pivot.ang_factor_b
         self.camera.angle += self.camera.angular_momentum
         self.camera.angle %= float32(360)
 
@@ -305,7 +322,11 @@ class Game:
     def calculate_input_for_desired_speed(self, movement_type, desired_speed):
 
         _, drag_factor = self._get_style_and_drag_factor(movement_type)
-        pal_factor = 1.2000011
+
+        if self.is_pal:
+            pal_factor = float32(1.2000011)
+        else:
+            pal_factor = float32(1.0000011)
 
         target_speed_xz = ((desired_speed - self.banjo.speed) / pal_factor + (self.banjo.speed * drag_factor)) / drag_factor
 
@@ -337,13 +358,42 @@ class Game:
 
     def calculate_input_for_desired_pos(self, movement_type, desired_pos):
 
-        return self.calculate_input_for_desired_speed(movement_type, (desired_pos-self.banjo.pos)*25)
+        if self.is_pal:
+            return self.calculate_input_for_desired_speed(movement_type, (desired_pos-self.banjo.pos)*25)
+        else:
+            return self.calculate_input_for_desired_speed(movement_type, (desired_pos-self.banjo.pos)*30)
 
     def calculate_input_for_desired_pos_no_overshoot(self, movement_type, desired_pos):
 
         assert movement_type == 'walk'
 
-        return self.calculate_input_for_desired_speed(movement_type, (desired_pos-self.banjo.pos)/0.11494243)
+        return self.calculate_input_for_desired_speed(movement_type, (desired_pos-self.banjo.pos)*8.7)
 
 
+'''
+distinct_y_inputs = [-61, -60, -59, -58, -57, -56, -55, -54, -53, -52, -51, -50, -49, -48, -47, -46, -45, -44, -43, -42, -41, -40, -39, -38, -37, -36, -35, -34, -33, -32, -31, -30, -29, -28, -27, -26, -25, -24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, 0, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61]
+distinct_y_inputs = [y for y in distinct_y_inputs if abs(y) > 13 or y == 0]
+
+
+if __name__ == '__main__':
+    
+    game = Game(Banjo((0  , 0  ), (0.0           , 0.0           ), 0 , 0), Camera((0  , 0 ), (0            , 0   ), 0 , 0   ), CameraPivot(2474.62084960938,792.052490234375,-1855.71276855469,1.75,3.75,2.75,12,1250.5,1250.5), False)
+    print(game.is_pal)
+    for y1 in distinct_y_inputs:
+        c1 = copy.copy(game)
+        c1._update_banjo('midair', 0, y1)
+        for y2 in distinct_y_inputs:
+         c2 = copy.copy(c1)
+         c2._update_banjo('midair', 0, y2)
+         for y3 in distinct_y_inputs:
+          c3 = copy.copy(c2)
+          c3._update_banjo('midair', 0, y3)
+          _, float_y4 = c3.calculate_input_for_desired_speed('midair', (0, 0))
+          for y4 in [math.floor(float_y4), math.ceil(float_y4)]:
+              game_copy = copy.copy(c3)
+              game_copy._update_banjo('midair', 0, y4)
+              pos = copy.copy(game_copy.banjo.pos)
+              game_copy._update_banjo('midair', 0, 0)
+              if np.array_equal(pos, game_copy.banjo.pos):
+                  print((y1, y2, y3, y4), game_copy.banjo.pos-game.banjo.pos)'''
 

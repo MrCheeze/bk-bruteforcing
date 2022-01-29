@@ -15,8 +15,13 @@ local Memory = { -- Version order: Europe, Japan, US 1.1, US 1.0
 	camera_y_rotation = {0x37E33C, 0x37E46C, 0x37CB6C, 0x37D96C}, -- Float
 	camera_y_angular_velocity = {0x37E39C, 0x37E4CC, 0x37CBCC, 0x37D9CC}, -- Float
 	
-	camera_region_index = {0x37C9E8, nil, nil, nil},
-	camera_region_table = {0x37DFB0, nil, nil, nil},
+	camera_region_index = {0x37C9E8, 0x37CB18, 0x37B218, 0x37C018},
+	camera_region_table = {0x37DFB0, 0x37E0E0, 0x37C810, 0x37D5E0},
+	
+	player_in_water = {0x37C931, 0x37CA61, 0x37B161, 0x37BF61},
+	floor_object_pointer = {0x37CBD0, 0x37CD00, 0x37B400, 0x37C200}, -- Pointer
+	map_tris_pointer = {0x382D28, 0x382E68, 0x381558, 0x382358},
+	map_model_pointer = {0x382D38, 0x382E78, 0x381568, 0x382368},
 }
 
 local movementStates = {
@@ -197,6 +202,77 @@ local supportedGames = {
 }
 
 local v = supportedGames[gameinfo.getromhash()].version
+local is_pal
+if v == 1 then
+	is_pal = 1
+else
+	is_pal = 0
+end
+
+local modelPointer = mainmemory.read_u32_be(Memory.map_model_pointer[v]) - 0x80000000
+local vertBase = modelPointer + mainmemory.read_u32_be(modelPointer + 0x10) + 0x18
+
+function getFloorCoords(vertIndex)
+	local x = mainmemory.read_s16_be(vertBase + (vertIndex * 0x10) + 0x00);
+	local y = mainmemory.read_s16_be(vertBase + (vertIndex * 0x10) + 0x02);
+	local z = mainmemory.read_s16_be(vertBase + (vertIndex * 0x10) + 0x04);
+	
+	return string.format("%d %d %d", x, y, z), string.format("%d %d %d", x, 0, z), x, y, z
+end
+
+-- Get the current floor triangle, and all triangles that share a vertex with it.
+local floor_verts = {}
+local nearby_tris = {}
+if mainmemory.readbyte(Memory.player_in_water[v]) ~= 0 and false then
+	print("In water! Not implemented yet.")
+else
+	local floorVert1, floorVert1XZ, x1, y1, z1 = getFloorCoords(mainmemory.read_u16_be(mainmemory.read_u32_be(Memory.floor_object_pointer[v]) - 0x80000000 + 0x04))
+	local floorVert2, floorVert2XZ, x2, y2, z2 = getFloorCoords(mainmemory.read_u16_be(mainmemory.read_u32_be(Memory.floor_object_pointer[v]) - 0x80000000 + 0x06))
+	local floorVert3, floorVert3XZ, x3, y3, z3 = getFloorCoords(mainmemory.read_u16_be(mainmemory.read_u32_be(Memory.floor_object_pointer[v]) - 0x80000000 + 0x08))
+	
+	print(string.format("Floor tris:\n%s %s %s", floorVert1, floorVert2, floorVert3))
+	
+	floor_verts[string.format("%s %s", floorVert1, floorVert2)] = true
+	floor_verts[string.format("%s %s", floorVert2, floorVert3)] = true
+	floor_verts[string.format("%s %s", floorVert3, floorVert1)] = true
+	
+	nearby_tris[string.format("%s %s %s", floorVert1XZ, floorVert2XZ, floorVert3XZ)] = true
+end
+
+local tris_context = mainmemory.read_u32_be(Memory.map_tris_pointer[v]) - 0x80000000
+
+local first_tri = tris_context + 0x18 + 4*mainmemory.read_u16_be(tris_context + 0x10)
+local tri_count = mainmemory.read_u16_be(tris_context + 0x14)
+local last_tri = first_tri+12*tri_count - 12
+
+print("Nearby tris:")
+for tri=first_tri,last_tri,12 do
+	local vert1, vert1XZ, x1, y1, z1 = getFloorCoords(mainmemory.read_u16_be(tri))
+	local vert2, vert2XZ, x2, y2, z2 = getFloorCoords(mainmemory.read_u16_be(tri + 2))
+	local vert3, vert3XZ, x3, y3, z3 = getFloorCoords(mainmemory.read_u16_be(tri + 4))
+	if floor_verts[string.format("%s %s", vert1, vert3)] or floor_verts[string.format("%s %s", vert3, vert2)] or floor_verts[string.format("%s %s", vert2, vert1)] then
+		if (x1 ~= x2 or x2 ~= x3) and (z1 ~= z2 or z2 ~= z3) and not (x1==x2 and z1==z2) and not (x1==x3 and z1==z3) and not (x2==x3 and z2==z3) then
+			nearby_tris[string.format("%s %s %s", vert1XZ, vert2XZ, vert3XZ)] = true
+		end
+	end
+end
+local f = io.open("gap_input.txt", 'w')
+for tri, v in pairs(nearby_tris) do
+	print(tri)
+	f:write(tri.."\n")
+end
+f:close()
+
+local cmd = 'echo 0.05 0.95 | BKGap_Multi gap_input.txt'
+print(cmd)
+
+os.remove('gap_results.txt')
+local ret = os.execute(cmd)
+if ret ~= 0 then
+	print("BKGap failed!")
+	
+	return
+end
 
 local x_pos = mainmemory.readfloat(Memory.x_position[v], true)
 local z_pos = mainmemory.readfloat(Memory.z_position[v], true)
@@ -237,10 +313,11 @@ for i=0,8 do
 	cam_region_info[i+1] = mainmemory.readfloat(cam_region_ptr - 0x80000000 + 4*i, true)
 end
 
-local cmd = string.format('python bk_searcher.py %s %s %s %s %s %s  %s %s %s %s %s %s  %s %s %s %s %s %s %s %s %s 2>stderr.log',
+local cmd = string.format('python bk_searcher.py %s %s %s %s %s %s  %s %s %s %s %s %s  %s %s %s %s %s %s %s %s %s %s 2>stderr.log',
 	x_pos, z_pos, x_speed, z_speed, angle, is_moving,
 	cam_x_pos, cam_z_pos, cam_x_speed, cam_z_speed, cam_angle, cam_angle_speed,
-	cam_region_info[1], cam_region_info[2], cam_region_info[3], cam_region_info[4], cam_region_info[5], cam_region_info[6], cam_region_info[7], cam_region_info[8], cam_region_info[9])
+	cam_region_info[1], cam_region_info[2], cam_region_info[3], cam_region_info[4], cam_region_info[5], cam_region_info[6], cam_region_info[7], cam_region_info[8], cam_region_info[9],
+	is_pal)
 
 print(cmd)
 os.remove('stdout.log')
@@ -270,9 +347,10 @@ f:close()
 
 local joypad_script = stdout:gmatch("joypad\.[^\r\n]+")()
 if joypad_script ~= nil then
-	client.unpause()
+	print("Executing inputs...")
 	loadstring(joypad_script)()
 	client.pause()
 end
 
 print("done.")
+
